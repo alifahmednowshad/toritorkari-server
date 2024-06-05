@@ -1,8 +1,30 @@
-# React + Vite
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+# Toritorkari
 
-Currently, two official plugins are available:
+Welcome to Toritorkari, your one-stop online platform for purchasing fresh vegetables, meat, fruits, and nuts! This project combines the power of React.js, Tailwind CSS, and MongoDB to create a seamless shopping experience for users.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Live Links
+
+- **Client Site:** [Toritorkari Client](https://toritorkari.vercel.app/)
+- **Server Site:** [Toritorkari Server](https://toritorkari-server.vercel.app/)
+
+## Features
+
+- **User Authentication:** Secure user authentication using JWT tokens.
+- **Product Listings:** Browse and purchase a wide variety of fresh vegetables, meat, fruits, and nuts.
+- **Responsive Design:** Enjoy a seamless shopping experience on any device, thanks to the responsive design powered by Tailwind CSS.
+- **Easy Navigation:** Explore different product categories and easily navigate between pages using React Router DOM.
+
+## Technologies Used
+
+- **Client Side:**
+  - React.js
+  - React Router DOM
+  - Tailwind CSS
+  - React Hot Toast (for toast notifications)
+- **Server Side:**
+  - Node.js
+  - Express.js
+  - MongoDB (with Mongoose)
+  - JWT Authentication
+  - Environment Variables (using dotenv)
