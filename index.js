@@ -2,39 +2,39 @@ require("dotenv").config();
 const express = require("express");
 const app = express();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
-const jwt = require("jsonwebtoken");
+// const jwt = require("jsonwebtoken");
 const cors = require("cors");
-const port = process.env.PORT || 5000; 
+const port = process.env.PORT || 5000;
 
 app.use(cors());
 app.use(express.json());
 
-function createToken(user) {
-  const token = jwt.sign(
-    {
-      email: user.email,
-    },
-    process.env.JWT_SECRET,
-    { expiresIn: "7d" }
-  );
-  return token;
-}
+// function createToken(user) {
+//   const token = jwt.sign(
+//     {
+//       email: user.email,
+//     },
+//     process.env.JWT_SECRET,
+//     { expiresIn: "7d" }
+//   );
+//   return token;
+// }
 
-function verifyToken(req, res, next) {
-  try {
-    const token = req.headers.authorization.split(" ")[1];
-    const verify = jwt.verify(token, process.env.JWT_SECRET); 
-    if (!verify?.email) {
-      return res.status(403).send("You are not authorized"); 
-    }
-    req.user = verify.email;
-    next();
-  } catch (error) {
-    return res.status(401).send("Unauthorized"); 
-  }
-}
+// function verifyToken(req, res, next) {
+//   try {
+//     const token = req.headers.authorization.split(" ")[1];
+//     const verify = jwt.verify(token, process.env.JWT_SECRET);
+//     if (!verify?.email) {
+//       return res.status(403).send("You are not authorized");
+//     }
+//     req.user = verify.email;
+//     next();
+//   } catch (error) {
+//     return res.status(401).send("Unauthorized");
+//   }
+// }
 
-const uri = process.env.MONGODB_URI; 
+const uri = process.env.MONGODB_URI;
 
 const client = new MongoClient(uri, {
   serverApi: {
@@ -65,13 +65,13 @@ async function run() {
       res.json(productData);
     });
 
-    app.post("/product", verifyToken, async (req, res) => {
+    app.post("/product", async (req, res) => {
       const productData = req.body;
       const result = await productCollection.insertOne(productData);
       res.send(result);
     });
 
-    app.patch("/product/:id", verifyToken, async (req, res) => {
+    app.patch("/product/:id", async (req, res) => {
       try {
         const id = req.params.id;
         const updatedData = req.body;
@@ -93,7 +93,7 @@ async function run() {
       }
     });
 
-    app.delete("/product/:id", verifyToken, async (req, res) => {
+    app.delete("/product/:id", async (req, res) => {
       const id = req.params.id;
       const result = await productCollection.deleteOne({
         _id: new ObjectId(id),
@@ -102,6 +102,10 @@ async function run() {
     });
 
     // user
+    app.get("/user", async (req, res) => {
+      const userData = await userCollection.find().toArray();
+      res.send(userData);
+    });
     app.post("/user", async (req, res) => {
       const user = req.body;
 
@@ -153,5 +157,3 @@ app.get("/", (req, res) => {
 app.listen(port, () => {
   console.log(`App is listening on port: ${port}`);
 });
-
-

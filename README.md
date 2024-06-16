@@ -1,4 +1,3 @@
-
 # Toritorkari
 
 Welcome to Toritorkari, your one-stop online platform for purchasing fresh vegetables, meat, fruits, and nuts! This project combines the power of React.js, Tailwind CSS, and MongoDB to create a seamless shopping experience for users.
@@ -6,7 +5,7 @@ Welcome to Toritorkari, your one-stop online platform for purchasing fresh veget
 ## Live Links
 
 - **Client Site:** [Toritorkari Client](https://toritorkari.vercel.app/)
-- **Server Site:** [Toritorkari Server](https://toritorkari-server.vercel.app/)
+- **Server Site:** [Toritorkari Server](http://localhost:5000/)
 
 ## Features
 
