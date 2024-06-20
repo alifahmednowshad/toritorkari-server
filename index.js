@@ -2,40 +2,45 @@ require("dotenv").config();
 const express = require("express");
 const app = express();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
-// const jwt = require("jsonwebtoken");
+const jwt = require("jsonwebtoken");
 const cors = require("cors");
-const port = process.env.PORT || 5000;
+const admin = require("firebase-admin");
 
 app.use(cors());
 app.use(express.json());
 
-// function createToken(user) {
-//   const token = jwt.sign(
-//     {
-//       email: user.email,
-//     },
-//     process.env.JWT_SECRET,
-//     { expiresIn: "7d" }
-//   );
-//   return token;
-// }
+const serviceAccount = require("./firebase-admin-sdk.json");
 
-// function verifyToken(req, res, next) {
-//   try {
-//     const token = req.headers.authorization.split(" ")[1];
-//     const verify = jwt.verify(token, process.env.JWT_SECRET);
-//     if (!verify?.email) {
-//       return res.status(403).send("You are not authorized");
-//     }
-//     req.user = verify.email;
-//     next();
-//   } catch (error) {
-//     return res.status(401).send("Unauthorized");
-//   }
-// }
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
+
+function createToken(user) {
+  const token = jwt.sign(
+    {
+      email: user.email,
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: "7d" }
+  );
+  return token;
+}
+
+function verifyToken(req, res, next) {
+  try {
+    const token = req.headers.authorization.split(" ")[1];
+    const verify = jwt.verify(token, process.env.JWT_SECRET);
+    if (!verify?.email) {
+      return res.status(403).send("You are not authorized");
+    }
+    req.email = verify.email; // Ensure the email is attached to the request object
+    next();
+  } catch (error) {
+    return res.status(401).send("Unauthorized");
+  }
+}
 
 const uri = process.env.MONGODB_URI;
-
 const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
@@ -51,10 +56,23 @@ async function run() {
     const productCollection = toritorkaiDB.collection("productCollection");
     const userCollection = toritorkaiDB.collection("userCollection");
 
-    // product
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.email;
+      const query = { email: email };
+      const user = await userCollection.findOne(query);
+      if (!user || user.role !== "admin") {
+        return res.status(403).send({
+          error: true,
+          message: "You are not authorized as admin",
+        });
+      }
+      next();
+    };
+
+    // Product Routes
     app.get("/product", async (req, res) => {
       const productData = await productCollection.find().toArray();
-      res.send(productData);
+      res.json(productData);
     });
 
     app.get("/product/:id", async (req, res) => {
@@ -65,13 +83,18 @@ async function run() {
       res.json(productData);
     });
 
-    app.post("/product", async (req, res) => {
+    app.post("/product", verifyToken, verifyAdmin, async (req, res) => {
       const productData = req.body;
-      const result = await productCollection.insertOne(productData);
-      res.send(result);
+      try {
+        const result = await productCollection.insertOne(productData);
+        res.json(result.ops[0]);
+      } catch (error) {
+        console.error("Error inserting product:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+      }
     });
 
-    app.patch("/product/:id", async (req, res) => {
+    app.patch("/product/:id", verifyToken, verifyAdmin, async (req, res) => {
       try {
         const id = req.params.id;
         const updatedData = req.body;
@@ -93,67 +116,147 @@ async function run() {
       }
     });
 
-    app.delete("/product/:id", async (req, res) => {
+    app.delete("/product/:id", verifyToken, verifyAdmin, async (req, res) => {
       const id = req.params.id;
-      const result = await productCollection.deleteOne({
-        _id: new ObjectId(id),
-      });
-      res.send(result);
+      try {
+        const result = await productCollection.deleteOne({
+          _id: new ObjectId(id),
+        });
+        res.json({ message: "Product deleted successfully" });
+      } catch (error) {
+        console.error("Error deleting product:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+      }
     });
 
-    // user
+    // User Routes
     app.get("/user", async (req, res) => {
       const userData = await userCollection.find().toArray();
-      res.send(userData);
+      res.json(userData);
     });
+
     app.post("/user", async (req, res) => {
       const user = req.body;
-
-      const token = createToken(user);
-      const isUserExist = await userCollection.findOne({ email: user?.email });
-      if (isUserExist?._id) {
-        return res.send({
+      try {
+        const isUserExist = await userCollection.findOne({ email: user.email });
+        if (isUserExist) {
+          const token = createToken(user);
+          return res.json({
+            status: "success",
+            message: "Login success",
+            token,
+          });
+        }
+        // Ensure a role is set, default to "user"
+        user.role = user.role || "user";
+        await userCollection.insertOne(user);
+        const token = createToken(user);
+        res.json({
           status: "success",
-          message: "Login success",
+          message: "User registered successfully",
           token,
         });
+      } catch (error) {
+        console.error("Error registering user:", error);
+        res.status(500).json({ error: "Internal Server Error" });
       }
-      await userCollection.insertOne(user);
-      return res.send({ token });
     });
 
-    app.get("/user/get/:id", async (req, res) => {
+    app.get("/user/:id", async (req, res) => {
       const id = req.params.id;
-      console.log(id);
-      const result = await userCollection.findOne({ _id: new ObjectId(id) });
-      res.send(result);
+      try {
+        const result = await userCollection.findOne({ _id: new ObjectId(id) });
+        res.json(result);
+      } catch (error) {
+        console.error("Error fetching user:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+      }
     });
 
-    app.get("/user/:email", async (req, res) => {
-      const email = req.params.email;
-      const result = await userCollection.findOne({ email });
-      res.send(result);
-    });
-
-    app.patch("/user/:email", async (req, res) => {
+    app.patch("/user/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
       const userData = req.body;
-      const result = await userCollection.updateOne(
-        { email },
-        { $set: userData },
-        { upsert: true }
-      );
+      // Prevent changing role to anything other than "user" or "admin"
+      if (userData.role && !["user", "admin"].includes(userData.role)) {
+        return res.status(400).send("Invalid role");
+      }
+      try {
+        const result = await userCollection.updateOne(
+          { email },
+          { $set: userData },
+          { upsert: true }
+        );
+        res.json({ message: "User updated successfully" });
+      } catch (error) {
+        console.error("Error updating user:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+      }
+    });
+
+    // Endpoint to check if user is an admin
+    app.get("/user/admin/:email", async (req, res) => {
+      const email = req.params.email;
+      try {
+        const user = await userCollection.findOne({ email });
+        if (!user || user.role !== "admin") {
+          res.json({ isAdmin: false });
+        } else {
+          res.json({ isAdmin: true });
+        }
+      } catch (error) {
+        console.error("Error fetching admin status:", error);
+        res.status(500).json({ error: "Failed to fetch admin status" });
+      }
+    });
+
+    app.patch("/user/admin/:id", verifyToken, verifyAdmin, async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: {
+          role: "admin",
+        },
+      };
+
+      const result = await userCollection.updateOne(filter, updateDoc);
       res.send(result);
     });
+
+    // Endpoint to delete a user by UID from both MongoDB and Firebase
+    app.delete("/user/:uid", verifyToken, verifyAdmin, async (req, res) => {
+      const uid = req.params.uid;
+
+      try {
+        // Delete user from MongoDB by the UID field
+        const deleteResult = await userCollection.deleteOne({ uid: uid });
+
+        if (deleteResult.deletedCount === 0) {
+          return res.status(404).json({ error: "User not found in MongoDB" });
+        }
+
+        // Delete user from Firebase
+        await admin.auth().deleteUser(uid);
+
+        res.json({
+          message: "User deleted successfully from both MongoDB and Firebase",
+        });
+      } catch (error) {
+        console.error("Error deleting user:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+      }
+    });
   } finally {
+    // Ensuring proper cleanup if necessary
   }
 }
+
 run().catch(console.dir);
 
 app.get("/", (req, res) => {
   res.send("Toritorkari server is connected.");
 });
 
+const port = process.env.PORT || 5000;
 app.listen(port, () => {
   console.log(`App is listening on port: ${port}`);
 });
