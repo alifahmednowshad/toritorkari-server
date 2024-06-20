@@ -4,12 +4,13 @@ const app = express();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const jwt = require("jsonwebtoken");
 const cors = require("cors");
+const bcrypt = require("bcrypt");
 const admin = require("firebase-admin");
 
 app.use(cors());
 app.use(express.json());
 
-const serviceAccount = require("./firebase-admin-sdk.json");
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -68,66 +69,6 @@ async function run() {
       }
       next();
     };
-
-    // Product Routes
-    app.get("/product", async (req, res) => {
-      const productData = await productCollection.find().toArray();
-      res.json(productData);
-    });
-
-    app.get("/product/:id", async (req, res) => {
-      const id = req.params.id;
-      const productData = await productCollection.findOne({
-        _id: new ObjectId(id),
-      });
-      res.json(productData);
-    });
-
-    app.post("/product", verifyToken, verifyAdmin, async (req, res) => {
-      const productData = req.body;
-      try {
-        const result = await productCollection.insertOne(productData);
-        res.json(result.ops[0]);
-      } catch (error) {
-        console.error("Error inserting product:", error);
-        res.status(500).json({ error: "Internal Server Error" });
-      }
-    });
-
-    app.patch("/product/:id", verifyToken, verifyAdmin, async (req, res) => {
-      try {
-        const id = req.params.id;
-        const updatedData = req.body;
-        delete updatedData._id;
-
-        const result = await productCollection.updateOne(
-          { _id: new ObjectId(id) },
-          { $set: updatedData }
-        );
-
-        if (result.modifiedCount === 0) {
-          return res.status(404).send("Product not found");
-        }
-
-        res.json({ message: "Product updated successfully" });
-      } catch (error) {
-        console.error("Error updating product:", error);
-        res.status(500).send("Internal Server Error");
-      }
-    });
-
-    app.delete("/product/:id", verifyToken, verifyAdmin, async (req, res) => {
-      const id = req.params.id;
-      try {
-        const result = await productCollection.deleteOne({
-          _id: new ObjectId(id),
-        });
-        res.json({ message: "Product deleted successfully" });
-      } catch (error) {
-        console.error("Error deleting product:", error);
-        res.status(500).json({ error: "Internal Server Error" });
-      }
-    });
 
     // User Routes
     app.get("/user", async (req, res) => {
@@ -193,7 +134,73 @@ async function run() {
       }
     });
 
-    // Endpoint to check if user is an admin
+    // app.patch("/user/:email", verifyToken, async (req, res) => {
+    //   const email = req.params.email;
+    //   const {
+    //     name,
+    //     oldPassword,
+    //     newPassword,
+    //     confirmPassword,
+    //     photoURL,
+    //     role,
+    //   } = req.body;
+    //   let userData = {};
+
+    //   try {
+    //     // Fetch current user details
+    //     const user = await userCollection.findOne({ email });
+
+    //     if (!user) {
+    //       return res.status(404).json({ error: "User not found" });
+    //     }
+
+    //     // Prevent changing role to anything other than "user" or "admin"
+    //     if (role && !["user", "admin"].includes(role)) {
+    //       return res.status(400).send("Invalid role");
+    //     }
+
+    //     // Check if the old password matches
+    //     if (oldPassword && newPassword && confirmPassword) {
+    //       const isMatch = await bcrypt.compare(oldPassword, user.password);
+    //       if (!isMatch) {
+    //         return res.status(400).json({ error: "Old password is incorrect" });
+    //       }
+
+    //       // Check if the new password matches the confirmation
+    //       if (newPassword !== confirmPassword) {
+    //         return res
+    //           .status(400)
+    //           .json({ error: "New passwords do not match" });
+    //       }
+
+    //       // Hash the new password
+    //       const hashedPassword = await bcrypt.hash(newPassword, 10);
+    //       userData.password = hashedPassword;
+    //     }
+
+    //     // Update other fields if provided
+    //     if (name) userData.name = name;
+    //     if (photoURL) userData.photoURL = photoURL;
+    //     if (role) userData.role = role;
+
+    //     // Update user in the database
+    //     const result = await userCollection.updateOne(
+    //       { email },
+    //       { $set: userData },
+    //       { upsert: true }
+    //     );
+
+    //     if (result.modifiedCount === 0) {
+    //       return res.status(404).send("User not found");
+    //     }
+
+    //     res.json({ message: "User updated successfully" });
+    //   } catch (error) {
+    //     console.error("Error updating user:", error);
+    //     res.status(500).json({ error: "Internal Server Error" });
+    //   }
+    // });
+
     app.get("/user/admin/:email", async (req, res) => {
       const email = req.params.email;
       try {
@@ -209,7 +216,7 @@ async function run() {
       }
     });
 
-    app.patch("/user/admin/:id", verifyToken, verifyAdmin, async (req, res) => {
+    app.patch("/user/admin/:id", verifyToken, async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
       const updateDoc = {
@@ -223,7 +230,7 @@ async function run() {
     });
 
     // Endpoint to delete a user by UID from both MongoDB and Firebase
-    app.delete("/user/:uid", verifyToken, verifyAdmin, async (req, res) => {
+    app.delete("/user/:uid", verifyToken, async (req, res) => {
       const uid = req.params.uid;
 
       try {
@@ -242,6 +249,66 @@ async function run() {
         });
       } catch (error) {
         console.error("Error deleting user:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+      }
+    });
+
+    // Product Routes
+    app.get("/product", async (req, res) => {
+      const productData = await productCollection.find().toArray();
+      res.json(productData);
+    });
+
+    app.get("/product/:id", async (req, res) => {
+      const id = req.params.id;
+      const productData = await productCollection.findOne({
+        _id: new ObjectId(id),
+      });
+      res.json(productData);
+    });
+
+    app.post("/product", verifyToken, verifyAdmin, async (req, res) => {
+      const productData = req.body;
+      try {
+        const result = await productCollection.insertOne(productData);
+        res.json(result.ops[0]);
+      } catch (error) {
+        console.error("Error inserting product:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+      }
+    });
+
+    app.patch("/product/:id", verifyToken, verifyAdmin, async (req, res) => {
+      try {
+        const id = req.params.id;
+        const updatedData = req.body;
+        delete updatedData._id;
+
+        const result = await productCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: updatedData }
+        );
+
+        if (result.modifiedCount === 0) {
+          return res.status(404).send("Product not found");
+        }
+
+        res.json({ message: "Product updated successfully" });
+      } catch (error) {
+        console.error("Error updating product:", error);
+        res.status(500).send("Internal Server Error");
+      }
+    });
+
+    app.delete("/product/:id", verifyToken, verifyAdmin, async (req, res) => {
+      const id = req.params.id;
+      try {
+        const result = await productCollection.deleteOne({
+          _id: new ObjectId(id),
+        });
+        res.json({ message: "Product deleted successfully" });
+      } catch (error) {
+        console.error("Error deleting product:", error);
         res.status(500).json({ error: "Internal Server Error" });
       }
     });
