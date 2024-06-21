@@ -34,7 +34,7 @@ function verifyToken(req, res, next) {
     if (!verify?.email) {
       return res.status(403).send("You are not authorized");
     }
-    req.email = verify.email; // Ensure the email is attached to the request object
+    req.email = verify.email;
     next();
   } catch (error) {
     return res.status(401).send("Unauthorized");
