@@ -229,7 +229,7 @@ async function run() {
       res.send(result);
     });
 
-    // Endpoint to delete a user by UID from both MongoDB and Firebase
+    // Delete a user by UID from both MongoDB and Firebase
     app.delete("/user/:uid", verifyToken, async (req, res) => {
       const uid = req.params.uid;
 
